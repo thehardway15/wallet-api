@@ -43,6 +43,29 @@ export const transfers = functions
     res.json(transferList.docs.map(transfer => transfer.data()));
   })
 
+export const updateBalance = functions
+  .region('europe-west1')
+  .firestore
+  .document('/wallets/{walletId}/jar/{jarName}/transfers/{transfer}')
+  .onCreate(async (change, context) => {
+    const walletId = context.params.walletId
+    const jarName = context.params.jarName
+
+    type Transfer = {
+      amount: number
+    }
+
+    const response = await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarName}`).collection('transfers').get()
+    const transferList: Transfer[] = R.map(d => { return { amount: d.get('amount') }}, response.docs)
+
+    const balanceJar =  R.pipe(
+      R.map(R.path(['amount'])),
+      R.sum,
+    )(transferList)
+
+    await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarName}`).set({ balance: balanceJar }, { merge: true })
+  })
+
 export const balance = functions
   .region('europe-west1')
   .https
@@ -52,17 +75,7 @@ export const balance = functions
     if (!wallet_id) res.status(400).send('Bad request');
     if (!jar_name) res.status(400).send('Bad request');
 
-    type Transfer = {
-      amount: number
-    }
-
-    const response = await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).collection('transfers').get()
-    const transferList: Transfer[] = R.map(d => { return { amount: d.get('amount') }}, response.docs)
-
-    const balanceJar =  R.pipe(
-      R.map(R.path(['amount'])),
-      R.sum,
-    )(transferList)
-
-    res.json({ balanceJar })
+    const response = await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).get()
+    const jar = response.data()
+    res.json({ balanceJar: jar.balance || 0 })
   })
