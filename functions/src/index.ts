@@ -15,6 +15,20 @@ export const wallet = functions
     res.json(jars.docs.map(doc => doc.id));
   });
 
+export const payout = functions
+  .region('europe-west1')
+  .https
+  .onRequest(async (req, res) => {
+        const wallet_id = req.query.wallet;
+        const jar_name = req.query.jar;
+        const amount = req.query.amount ? parseInt(`${req.query.amount}`, 10) : null
+        if (!wallet_id) res.status(400).send('Bad request');
+        if (!jar_name) res.status(400).send('Bad request');
+        if (!amount) res.status(400).send('Bad request');
+
+        await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).collection('transfers').add({ amount: -1 * amount });
+      });
+
 export const payin = functions
   .region('europe-west1')
   .https
