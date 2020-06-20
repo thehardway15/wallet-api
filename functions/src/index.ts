@@ -6,7 +6,7 @@ admin.initializeApp()
 const db = admin.firestore()
 
 export const wallet = functions
-  .region('europe-west1')
+//  .region('europe-west1')
   .https
   .onRequest(async (req, res) => {
     const wallet_id = req.query.wallet;
@@ -16,7 +16,7 @@ export const wallet = functions
   });
 
 export const payout = functions
-  .region('europe-west1')
+//  .region('europe-west1')
   .https
   .onRequest(async (req, res) => {
         const wallet_id = req.query.wallet;
@@ -27,10 +27,11 @@ export const payout = functions
         if (!amount) res.status(400).send('Bad request');
 
         await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).collection('transfers').add({ amount: -1 * amount });
+        res.status(201).send('OK')
       });
 
 export const payin = functions
-  .region('europe-west1')
+//  .region('europe-west1')
   .https
   .onRequest(async (req, res) => {
     const wallet_id = req.query.wallet;
@@ -45,7 +46,7 @@ export const payin = functions
   });
 
 export const transfers = functions
-  .region('europe-west1')
+//  .region('europe-west1')
   .https
   .onRequest(async (req, res) => {
     const wallet_id = req.query.wallet;
@@ -58,7 +59,7 @@ export const transfers = functions
   })
 
 export const updateBalance = functions
-  .region('europe-west1')
+//  .region('europe-west1')
   .firestore
   .document('/wallets/{walletId}/jar/{jarName}/transfers/{transfer}')
   .onCreate(async (change, context) => {
@@ -81,7 +82,7 @@ export const updateBalance = functions
   })
 
 export const balance = functions
-  .region('europe-west1')
+//  .region('europe-west1')
   .https
   .onRequest(async (req, res) => {
     const wallet_id = req.query.wallet;

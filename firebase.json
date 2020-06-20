@@ -3,6 +3,16 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "hosting": {
+    "public": "public",
+    "rewrites": [
+      { "source": "/wallet", "function": "wallet" },
+      { "source": "/payin", "function": "payin" },
+      { "source": "/payout", "function": "payout" },
+      { "source": "/balance", "function": "balance" },
+      { "source": "/transfers", "function": "transfers" }
+    ]
+  },
   "functions": {
     "predeploy": [
       "npm --prefix \"$RESOURCE_DIR\" run lint",
