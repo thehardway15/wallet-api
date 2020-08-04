@@ -1,62 +1,118 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import * as express from 'express';
+import * as bodyParser from 'body-parser';
 import * as R from 'ramda';
 
 admin.initializeApp()
 const db = admin.firestore()
 
-export const wallet = functions
-//  .region('europe-west1')
-  .https
-  .onRequest(async (req, res) => {
-    const wallet_id = req.query.wallet;
-    if (!wallet_id) res.status(400).send('Bad request');
-    const jars = await  db.collection('wallets').doc(`${wallet_id}`).collection('jar').get()
-    res.json(jars.docs.map(doc => doc.id));
-  });
+const app = express();
+const main = express();
 
-export const payout = functions
-//  .region('europe-west1')
-  .https
-  .onRequest(async (req, res) => {
-        const wallet_id = req.query.wallet;
-        const jar_name = req.query.jar;
-        const amount = req.query.amount ? parseInt(`${req.query.amount}`, 10) : null
-        if (!wallet_id) res.status(400).send('Bad request');
-        if (!jar_name) res.status(400).send('Bad request');
-        if (!amount) res.status(400).send('Bad request');
+main.use('/api/v1', app);
+main.use(bodyParser.json());
 
-        await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).collection('transfers').add({ amount: -1 * amount });
-        res.status(201).send('OK')
-      });
+export const webApi = functions.https.onRequest(main);
 
-export const payin = functions
-//  .region('europe-west1')
-  .https
-  .onRequest(async (req, res) => {
-    const wallet_id = req.query.wallet;
-    const jar_name = req.query.jar;
-    const amount = req.query.amount ? parseInt(`${req.query.amount}`, 10) : null
-    if (!wallet_id) res.status(400).send('Bad request');
-    if (!jar_name) res.status(400).send('Bad request');
-    if (!amount) res.status(400).send('Bad request');
+interface Jar {
+  id: string
+  balance?: number
+  url?: string
+  transfers?: string
+}
 
-    await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).collection('transfers').add({ amount });
-    res.status(201).send('OK')
-  });
+app.get('/wallets/:wallet/jars', async (req, res) => {
+  const walletId = req.params.wallet;
+  if (!walletId) res.status(400).send('Bad request')
 
-export const transfers = functions
-//  .region('europe-west1')
-  .https
-  .onRequest(async (req, res) => {
-    const wallet_id = req.query.wallet;
-    const jar_name = req.query.jar;
-    if (!wallet_id) res.status(400).send('Bad request');
-    if (!jar_name) res.status(400).send('Bad request');
+  const jars: Jar[] = [];
 
-    const transferList = await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).collection('transfers').get();
-    res.json(transferList.docs.map(transfer => transfer.data()));
+  const jarQuerySnapshot = await db.collection('wallets')
+    .doc(walletId)
+    .collection('jar')
+    .get()
+
+  jarQuerySnapshot.forEach(
+    doc => {
+      jars.push({ 
+        id: doc.id,
+        url: `https://wallet-api.thehardway.pl/api/v1/wallets/${walletId}/jars/${doc.id}`
+      })
+    }
+  )
+
+  res.json(jars)
+});
+
+app.get('/wallets/:wallet/jars/:jar', async (req, res) => {
+  const walletId = req.params.wallet;
+  const jarId = req.params.jar;
+
+  if (!walletId) res.status(400).send('Bad request')
+  if (!jarId) res.status(400).send('Bad request')
+
+  const jar = await db.collection('wallets')
+    .doc(walletId)
+    .collection('jar')
+    .doc(jarId)
+    .get()
+
+  res.json({
+    id: jar.id,
+    balance: jar.data().balance,
+    transfers: `https://wallet-api.thehardway.pl/api/v1/wallets/${walletId}/jars/${jar.id}/transfers`
   })
+});
+
+app.get('/wallets/:wallet/jars/:jar/transfers', async (req, res) => {
+  const walletId = req.params.wallet;
+  const jarId = req.params.jar;
+
+  if (!walletId) res.status(400).send('Bad request')
+  if (!jarId) res.status(400).send('Bad request')
+
+  const transfers = []
+
+  const transfersSnapchot = await db.collection('wallets')
+    .doc(walletId)
+    .collection('jar')
+    .doc(jarId)
+    .collection('transfers')
+    .get()
+
+  transfersSnapchot.forEach(
+    doc => {
+      transfers.push({
+        id: doc.id,
+        amount: doc.data().amount
+      })
+    }
+  )
+
+  res.json(transfers)
+});
+
+app.post('/wallets/:wallet/jars/:jar/transfers', async (req, res) => {
+  const walletId = req.params.wallet;
+  const jarId = req.params.jar;
+
+  const amount = req.body.amount ? parseInt(`${req.body.amount}`, 10) : null
+
+  if (!walletId) res.status(400).send('Bad request')
+  if (!jarId) res.status(400).send('Bad request')
+  if (!amount) res.status(400).send('Bad request');
+
+  const transferRef = await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarId}`).collection('transfers').add({ amount });
+  const transfer = await transferRef.get();
+
+  res.json({
+    id: transfer.id,
+    amount: transfer.data().amount
+  })
+
+
+});
 
 export const updateBalance = functions
 //  .region('europe-west1')
@@ -79,18 +135,4 @@ export const updateBalance = functions
     )(transferList)
 
     await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarName}`).set({ balance: balanceJar }, { merge: true })
-  })
-
-export const balance = functions
-//  .region('europe-west1')
-  .https
-  .onRequest(async (req, res) => {
-    const wallet_id = req.query.wallet;
-    const jar_name = req.query.jar;
-    if (!wallet_id) res.status(400).send('Bad request');
-    if (!jar_name) res.status(400).send('Bad request');
-
-    const response = await db.collection('wallets').doc(`${wallet_id}`).collection('jar').doc(`${jar_name}`).get()
-    const jar = response.data()
-    res.json({ balanceJar: jar.balance || 0 })
   })

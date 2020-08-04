@@ -5,12 +5,13 @@
   },
   "hosting": {
     "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "rewrites": [
-      { "source": "/wallet", "function": "wallet" },
-      { "source": "/payin", "function": "payin" },
-      { "source": "/payout", "function": "payout" },
-      { "source": "/balance", "function": "balance" },
-      { "source": "/transfers", "function": "transfers" }
+      { "source": "/api/v1/**", "function": "webApi" }
     ]
   },
   "functions": {
