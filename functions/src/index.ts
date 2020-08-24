@@ -51,10 +51,7 @@ app.get('/jars', async (req, res) => {
 
   const jars: Jar[] = [];
 
-  const jarQuerySnapshot = await db.collection('wallets')
-    .doc(res.locals.uid)
-    .collection('jar')
-    .get()
+  const jarQuerySnapshot = await db.collection(`wallets/${res.locals.uid}/jar`).get()
 
   jarQuerySnapshot.forEach(
     doc => {
@@ -72,11 +69,7 @@ app.get('/jars/:jar', async (req, res) => {
 
   if (!jarId) res.status(400).send('Bad request')
 
-  const jar = await db.collection('wallets')
-    .doc(res.locals.uid)
-    .collection('jar')
-    .doc(jarId)
-    .get()
+  const jar = await db.collection(`wallets/${res.locals.uid}/jar`).doc(`${jarId}`).get()
 
   res.json({
     id: jar.id,
@@ -91,12 +84,7 @@ app.get('/jars/:jar/transfers', async (req, res) => {
 
   const transfers = []
 
-  const transfersSnapchot = await db.collection('wallets')
-    .doc(res.locals.uid)
-    .collection('jar')
-    .doc(jarId)
-    .collection('transfers')
-    .get()
+  const transfersSnapchot = await db.collection(`wallets/${res.locals.uid}/jar/${jarId}/transfers`).get()
 
   transfersSnapchot.forEach(
     doc => {
@@ -118,7 +106,7 @@ app.post('/jars/:jar/transfers', async (req, res) => {
   if (!jarId) res.status(400).send('Bad request')
   if (!amount) res.status(400).send('Bad request');
 
-  const transferRef = await db.collection('wallets').doc(`${res.locals.uid}`).collection('jar').doc(`${jarId}`).collection('transfers').add({ amount });
+  const transferRef = await db.collection(`wallets/${res.locals.uid}/jar/${jarId}/transfers`).add({ amount });
   const transfer = await transferRef.get();
 
   res.json({
@@ -141,7 +129,7 @@ export const updateBalance = functions
       amount: number
     }
 
-    const response = await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarName}`).collection('transfers').get()
+    const response = await db.collection(`wallets/${walletId}/jar/${jarName}/transfers`).get()
     const transferList: Transfer[] = R.map(d => { return { amount: d.get('amount') }}, response.docs)
 
     const balanceJar =  R.pipe(
@@ -149,5 +137,5 @@ export const updateBalance = functions
       R.sum,
     )(transferList)
 
-    await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarName}`).set({ balance: balanceJar }, { merge: true })
+    await db.collection(`wallets/${walletId}/jar`).doc(`${jarName}`).set({ balance: balanceJar }, { merge: true })
   })
