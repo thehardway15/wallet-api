@@ -10,6 +10,31 @@ const db = admin.firestore()
 const app = express();
 const main = express();
 
+const isAuthenticated = async (req, res, next) => {
+  const { authorization } = req.headers;
+
+  if (!authorization) return res.status(401).send({ message: 'Unauthorized' });
+
+  if (!authorization.startsWith('Bearer')) return res.status(401).send({ message: 'Unauthorized' });
+
+  const split = authorization.split('Bearer ')
+  if (split.length !== 2) return res.status(401).send({ message: 'Unauthorized' });
+
+  const token = split[1]
+
+  try {
+    const decodeToken: admin.auth.DecodedIdToken = await admin.auth().verifyIdToken(token);
+    console.log('decodeToken', JSON.stringify(decodeToken));
+    res.locals = { ...res.locals, uid: decodeToken.uid, role: decodeToken.role, email: decodeToken.email }
+    return next()
+
+  } catch (err) {
+    console.error(`${err.code} - ${err.message}`)
+    return res.status(401).send({ message: 'Unauthorized' });
+  }
+}
+
+main.use(isAuthenticated);
 main.use('/api/v1', app);
 main.use(bodyParser.json());
 
@@ -22,22 +47,19 @@ interface Jar {
   transfers?: string
 }
 
-app.get('/wallets/:wallet/jars', async (req, res) => {
-  const walletId = req.params.wallet;
-  if (!walletId) res.status(400).send('Bad request')
+app.get('/jars', async (req, res) => {
 
   const jars: Jar[] = [];
 
   const jarQuerySnapshot = await db.collection('wallets')
-    .doc(walletId)
+    .doc(res.locals.uid)
     .collection('jar')
     .get()
 
   jarQuerySnapshot.forEach(
     doc => {
       jars.push({ 
-        id: doc.id,
-        url: `https://wallet-api.thehardway.pl/api/v1/wallets/${walletId}/jars/${doc.id}`
+        id: doc.id
       })
     }
   )
@@ -45,37 +67,32 @@ app.get('/wallets/:wallet/jars', async (req, res) => {
   res.json(jars)
 });
 
-app.get('/wallets/:wallet/jars/:jar', async (req, res) => {
-  const walletId = req.params.wallet;
+app.get('/jars/:jar', async (req, res) => {
   const jarId = req.params.jar;
 
-  if (!walletId) res.status(400).send('Bad request')
   if (!jarId) res.status(400).send('Bad request')
 
   const jar = await db.collection('wallets')
-    .doc(walletId)
+    .doc(res.locals.uid)
     .collection('jar')
     .doc(jarId)
     .get()
 
   res.json({
     id: jar.id,
-    balance: jar.data().balance,
-    transfers: `https://wallet-api.thehardway.pl/api/v1/wallets/${walletId}/jars/${jar.id}/transfers`
+    balance: jar.data().balance
   })
 });
 
-app.get('/wallets/:wallet/jars/:jar/transfers', async (req, res) => {
-  const walletId = req.params.wallet;
+app.get('/jars/:jar/transfers', async (req, res) => {
   const jarId = req.params.jar;
 
-  if (!walletId) res.status(400).send('Bad request')
   if (!jarId) res.status(400).send('Bad request')
 
   const transfers = []
 
   const transfersSnapchot = await db.collection('wallets')
-    .doc(walletId)
+    .doc(res.locals.uid)
     .collection('jar')
     .doc(jarId)
     .collection('transfers')
@@ -93,17 +110,15 @@ app.get('/wallets/:wallet/jars/:jar/transfers', async (req, res) => {
   res.json(transfers)
 });
 
-app.post('/wallets/:wallet/jars/:jar/transfers', async (req, res) => {
-  const walletId = req.params.wallet;
+app.post('/jars/:jar/transfers', async (req, res) => {
   const jarId = req.params.jar;
 
   const amount = req.body.amount ? parseInt(`${req.body.amount}`, 10) : null
 
-  if (!walletId) res.status(400).send('Bad request')
   if (!jarId) res.status(400).send('Bad request')
   if (!amount) res.status(400).send('Bad request');
 
-  const transferRef = await db.collection('wallets').doc(`${walletId}`).collection('jar').doc(`${jarId}`).collection('transfers').add({ amount });
+  const transferRef = await db.collection('wallets').doc(`${res.locals.uid}`).collection('jar').doc(`${jarId}`).collection('transfers').add({ amount });
   const transfer = await transferRef.get();
 
   res.json({

@@ -1,1 +1,14 @@
-turn back
+Logowanie: 
+
+echo '{"email": "email", "password": "password", "returnSecureToken": true}' | http post https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=[API_KEY]
+
+Widok słoika
+http -v get "https://wallet-api.thehardway.pl/api/v1/jars/Play" "Authorization:Bearer "$AUTH_TOKEN
+
+
+Lista słoików
+http -v get "https://wallet-api.thehardway.pl/api/v1/jars" "Authorization:Bearer "$AUTH_TOKEN
+
+
+Dodawanie operacji
+echo '{"amount": 150}' | http post "https://wallet-api.thehardway.pl/api/v1/jars/Play/transfers" "Authorization:Bearer "$AUTH_TOKEN
